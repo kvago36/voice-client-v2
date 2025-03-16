@@ -82,7 +82,7 @@ function App() {
     return (
       <Layout title="Распознавание голоса 🎤">
         <>
-          <p className="text-red-500 p-2">{errorText}</p>
+          {errorText && <p className="text-red-500 p-2">{errorText}</p>}
           <LoginForm onSubmit={login} />
           <Users users={users} />
         </>
