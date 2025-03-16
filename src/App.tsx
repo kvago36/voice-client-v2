@@ -2,14 +2,13 @@ import { useState, useEffect } from "react";
 
 import { HOST } from "./constants";
 
-import Texts from "./TextsTable";
-import Users from "./UsersTable";
-import LoginForm from "./LoginForm";
-import VoiceRecorder from "./VoiceRecorder";
+import Texts from "./components/TextsTable";
+import Users from "./components/UsersTable";
+import LoginForm from "./components/LoginForm";
+import VoiceRecorder from "./components/VoiceRecorder";
+import Layout from "./components/Layout";
 
 import { User, Text } from "./types";
-
-import Layout from "./Layout";
 
 function App() {
   const [name, setName] = useState("");

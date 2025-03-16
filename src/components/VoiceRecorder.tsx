@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 
-import { WS_HOST } from "./constants";
+import { WS_HOST } from "../constants";
 
-import { sliceAudioBuffer, convertToLinear16 } from "./utils";
+import { sliceAudioBuffer, convertToLinear16 } from "../utils";
 
 interface VoiceRecorderProps {
   onSave: (message: string) => void;
