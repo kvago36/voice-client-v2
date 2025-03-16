@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 
-import { WS_HOST } from './constants'
+import { WS_HOST } from "./constants";
 
-import { sliceAudioBuffer, convertToLinear16 } from './utils'
+import { sliceAudioBuffer, convertToLinear16 } from "./utils";
 
 interface VoiceRecorderProps {
-  onSave: (message: string) => void
+  onSave: (message: string) => void;
 }
 
 export default function VoiceRecorder({ onSave }: VoiceRecorderProps) {
@@ -45,10 +45,9 @@ export default function VoiceRecorder({ onSave }: VoiceRecorderProps) {
   }, []);
 
   const handleSave = () => {
-    onSave(message)
-    setMessage("")
+    onSave(message);
+    setMessage("");
   };
-
 
   const startRecording = async () => {
     setMessage("");
@@ -99,7 +98,6 @@ export default function VoiceRecorder({ onSave }: VoiceRecorderProps) {
     mediaRecorder.current?.stop();
     setIsRecording(false);
   };
-
 
   return (
     <>

@@ -35,16 +35,16 @@ function App() {
   }, [userId]);
 
   const logout = () => {
-    setName("")
-    setErrorText("")
-  } 
+    setName("");
+    setErrorText("");
+  };
 
   const login = async (name: string) => {
     try {
       const response = await fetch(`${HOST}/api/users/`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ username: name }),
       });
@@ -52,55 +52,68 @@ function App() {
       const user = await response.json();
 
       if (user) {
-        setUserId(user.user_id)
+        setUserId(user.user_id);
         setName(name as string);
       }
     } catch {
-      setErrorText("Error, server unavalible")
+      setErrorText("Error, server unavalible");
     }
   };
 
   const saveMessage = async (message: string) => {
     try {
       const response = await fetch(`${HOST}/api/users/${userId}`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          "Content-Type": "application/json"
-
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: message })
+        body: JSON.stringify({ text: message }),
       });
 
       const json = await response.json();
 
-      setTexts(json.texts)
+      setTexts(json.texts);
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
   };
 
   if (!name) {
     return (
-      <Layout title="Распознавание голоса в Next.js 🎤">
-          <>
-            <p className="text-red-500 p-2">{errorText}</p>
-            <LoginForm onSubmit={login} />
-            <Users users={users} />
-          </>
+      <Layout title="Распознавание голоса 🎤">
+        <>
+          <p className="text-red-500 p-2">{errorText}</p>
+          <LoginForm onSubmit={login} />
+          <Users users={users} />
+        </>
       </Layout>
-    )
+    );
   }
 
   return (
     <Layout title={`Добро пожаловать, ${name}! 🎤`}>
       <>
-      <VoiceRecorder onSave={saveMessage} />
-      <Texts texts={texts} />
-      <button type="button" onClick={logout} className="fixed top-0 right-0 p-2 cursor-pointer text-gray-500 hover:text-gray-700 focus:outline-none">
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+        <VoiceRecorder onSave={saveMessage} />
+        <Texts texts={texts} />
+        <button
+          type="button"
+          onClick={logout}
+          className="fixed top-0 right-0 p-2 cursor-pointer text-gray-500 hover:text-gray-700 focus:outline-none"
+        >
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
       </>
     </Layout>
   );

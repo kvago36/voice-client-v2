@@ -1,20 +1,20 @@
 import { FormEvent } from "react";
 
 interface LoginFormProps {
-  onSubmit: (name: string) => void
+  onSubmit: (name: string) => void;
 }
 
 export default function LoginForm({ onSubmit }: LoginFormProps) {
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-  
-      const formData = new FormData(e.currentTarget);
-      const name = formData.get("name");
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
 
-      if (name) {
-        onSubmit(name as string);
-      }
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get("name");
+
+    if (name) {
+      onSubmit(name as string);
     }
+  };
   return (
     <form
       onSubmit={handleSubmit}
