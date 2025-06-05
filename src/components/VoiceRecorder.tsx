@@ -51,38 +51,38 @@ export default function VoiceRecorder({ onSave }: VoiceRecorderProps) {
     setMessage("");
   };
 
-  const test = () => {
-    const samplesCount = 16384;
-    const input = new SharedArrayBuffer(4 * samplesCount);
-    const output = new SharedArrayBuffer(2 * samplesCount);
-    const floatArray = new Float32Array(input);
-    const intArray = new Int16Array(output);
+  // const test = () => {
+  //   const samplesCount = 16384;
+  //   const input = new SharedArrayBuffer(4 * samplesCount);
+  //   const output = new SharedArrayBuffer(2 * samplesCount);
+  //   const floatArray = new Float32Array(input);
+  //   const intArray = new Int16Array(output);
 
-    const input_ptr = alloc_f32(floatArray.byteLength);
-    const output_ptr = alloc_i16(intArray.byteLength);
+  //   const input_ptr = alloc_f32(floatArray.byteLength);
+  //   const output_ptr = alloc_i16(intArray.byteLength);
 
-    // Fill with random numbers between 0 and 1
-    for (let i = 0; i < floatArray.length; i++) {
-      floatArray[i] = Math.random();
-    }
+  //   // Fill with random numbers between 0 and 1
+  //   for (let i = 0; i < floatArray.length; i++) {
+  //     floatArray[i] = Math.random();
+  //   }
 
-    console.time('process_audio');
-    const result1 = process_audio(input_ptr, output_ptr, samplesCount);
-    console.timeEnd('process_audio');
+  //   console.time('process_audio');
+  //   const result1 = process_audio(input_ptr, output_ptr, samplesCount);
+  //   console.timeEnd('process_audio');
 
-    console.time('process_audio_simd');
-    const result2 = process_audio_simd(input_ptr, output_ptr, samplesCount);
-    console.timeEnd('process_audio_simd');
+  //   console.time('process_audio_simd');
+  //   const result2 = process_audio_simd(input_ptr, output_ptr, samplesCount);
+  //   console.timeEnd('process_audio_simd');
 
-    console.time('js');
-    for (let i = 0; i < floatArray.length; i++) {
-      // Clamp value between -1.0 and 1.0
-      const clamped = Math.max(-1.0, Math.min(1.0, floatArray[i]));
-      // Scale to 16-bit range and convert
-      intArray[i] = Math.round(clamped * 32767);
-    }
-    console.timeEnd('js');
-  }
+  //   console.time('js');
+  //   for (let i = 0; i < floatArray.length; i++) {
+  //     // Clamp value between -1.0 and 1.0
+  //     const clamped = Math.max(-1.0, Math.min(1.0, floatArray[i]));
+  //     // Scale to 16-bit range and convert
+  //     intArray[i] = Math.round(clamped * 32767);
+  //   }
+  //   console.timeEnd('js');
+  // }
 
 
   const startRecording = async () => {
@@ -150,7 +150,7 @@ export default function VoiceRecorder({ onSave }: VoiceRecorderProps) {
         {isRecording ? "⏹ Остановить" : "🎙 Начать запись"}
       </button>
       
-      <button onClick={test}>123</button>
+      {/* <button onClick={test}>123</button> */}
 
       <div className="flex items-center gap-4 p-3 my-3 shadow bg-white">
         <span className="text-gray-700 font-medium">Ваш запрос:</span>
