@@ -2,23 +2,67 @@ import { useState, useRef, useEffect } from "react";
 
 import { WS_HOST } from "../constants";
 
-// import { sliceAudioBuffer, convertToLinear16 } from "../utils";
-
-import { process_audio, process_audio_simd, alloc_f32, alloc_i16 } from '../../pkg/webaudio.js'
+import { Pointers, WasmExports, ProcessAudioFn } from "../types";
 
 interface VoiceRecorderProps {
   onSave: (message: string) => void;
 }
 
+const SAMPLES_COUNT = 16384;
+
 export default function VoiceRecorder({ onSave }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [message, setMessage] = useState("");
-  const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const AudioNodeRef = useRef<AudioWorkletNode | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const bufferRef = useRef<number[]>([]);
+  const memoryRef = useRef<WebAssembly.Memory>(null);
+  const pointerRef = useRef<Pointers>(null);
+  const processAudio = useRef<ProcessAudioFn | null>(null);
 
   useEffect(() => {
     const ws = new WebSocket(WS_HOST);
+
+    const memory = new WebAssembly.Memory({
+      initial: 32,
+      maximum: 64,
+      shared: true,
+    });
+
+    const importObject = {
+      env: {
+        memory,
+        console_log: (arg: string) => {
+          console.log(arg);
+        },
+      },
+    };
+
+    WebAssembly.instantiateStreaming(
+      fetch("native_webaudio_rust.wasm"),
+      importObject
+    ).then((module) => {
+      const exports = module.instance.exports as unknown as WasmExports;
+
+      const { alloc_f32, alloc_i16, process_audio_simd } = exports;
+
+      const input_ptr_1 = alloc_f32(SAMPLES_COUNT);
+      const input_ptr_2 = alloc_f32(SAMPLES_COUNT);
+      const output_ptr = alloc_i16(SAMPLES_COUNT);
+
+      processAudio.current = process_audio_simd;
+      memoryRef.current = memory;
+      pointerRef.current = {
+        input_ptr_1,
+        input_ptr_2,
+        output_ptr,
+      };
+    });
 
     ws.onopen = () => {
       console.log("WebSocket подключен");
@@ -51,81 +95,61 @@ export default function VoiceRecorder({ onSave }: VoiceRecorderProps) {
     setMessage("");
   };
 
-  // const test = () => {
-  //   const samplesCount = 16384;
-  //   const input = new SharedArrayBuffer(4 * samplesCount);
-  //   const output = new SharedArrayBuffer(2 * samplesCount);
-  //   const floatArray = new Float32Array(input);
-  //   const intArray = new Int16Array(output);
-
-  //   const input_ptr = alloc_f32(floatArray.byteLength);
-  //   const output_ptr = alloc_i16(intArray.byteLength);
-
-  //   // Fill with random numbers between 0 and 1
-  //   for (let i = 0; i < floatArray.length; i++) {
-  //     floatArray[i] = Math.random();
-  //   }
-
-  //   console.time('process_audio');
-  //   const result1 = process_audio(input_ptr, output_ptr, samplesCount);
-  //   console.timeEnd('process_audio');
-
-  //   console.time('process_audio_simd');
-  //   const result2 = process_audio_simd(input_ptr, output_ptr, samplesCount);
-  //   console.timeEnd('process_audio_simd');
-
-  //   console.time('js');
-  //   for (let i = 0; i < floatArray.length; i++) {
-  //     // Clamp value between -1.0 and 1.0
-  //     const clamped = Math.max(-1.0, Math.min(1.0, floatArray[i]));
-  //     // Scale to 16-bit range and convert
-  //     intArray[i] = Math.round(clamped * 32767);
-  //   }
-  //   console.timeEnd('js');
-  // }
-
-
   const startRecording = async () => {
     setMessage("");
 
+    setIsReady(false);
+    bufferRef.current = [];
+
     try {
-      // const buffer = new SharedArrayBuffer(16);
+      audioCtxRef.current = new AudioContext();
+      await audioCtxRef.current.audioWorklet.addModule("processor.js");
+      mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+      mediaSourceRef.current = audioCtxRef.current.createMediaStreamSource(
+        mediaStreamRef.current
+      );
 
-      const audioCtx = new AudioContext();
-
-      // Загружаем worklet-файл
-      await audioCtx.audioWorklet.addModule("processor.js");
-
-      // Получаем доступ к микрофону
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const source = audioCtx.createMediaStreamSource(stream);
-
-      const samplesCount = 16384;
-      const input = new SharedArrayBuffer(4 * samplesCount);
-      const output = new SharedArrayBuffer(2 * samplesCount);
-      const shared_input = new Float32Array(input);
-      const shared_output = new Int16Array(output);
-
-      const input_ptr = alloc_f32(shared_input.byteLength);
-      const output_ptr = alloc_i16(shared_output.byteLength);
-
-      // Создаем ноду с нашим AudioWorkletProcessor
-      const node = new AudioWorkletNode(audioCtx, "mic-processor", { processorOptions: { input, output } });
- 
-      // Получаем аудиоданные от worklet-а
-      node.port.onmessage = (e) => {
-        console.log("Audio frame:", e.data);
-
-        if (e.data.done === true) {
-          const result = process_audio(input_ptr, output_ptr, samplesCount);
-          console.log("Result:", result);
-
-          // wsRef.current?.send(linear16Data);
+      AudioNodeRef.current = new AudioWorkletNode(
+        audioCtxRef.current,
+        "mic-processor",
+        {
+          processorOptions: {
+            main_input: pointerRef.current!.input_ptr_1,
+            secondary_input: pointerRef.current!.input_ptr_2,
+            buffer: memoryRef.current!.buffer,
+            len: SAMPLES_COUNT,
+          },
         }
+      );
+
+      AudioNodeRef.current.port.onmessage = (e) => {
+        const process_audio_simd = processAudio.current!;
+
+        process_audio_simd(
+          e.data.ready
+            ? pointerRef.current!.input_ptr_2
+            : pointerRef.current!.input_ptr_1,
+          pointerRef.current!.output_ptr,
+          SAMPLES_COUNT
+        );
+
+        const copy = new Int16Array(
+          memoryRef.current!.buffer,
+          pointerRef.current!.output_ptr,
+          SAMPLES_COUNT
+        );
+
+        bufferRef.current.push(...copy);
+
+        wsRef.current?.send(new Int16Array(copy).buffer);
       };
 
       // Соединяем источник с обработчиком
-      source.connect(node).connect(audioCtx.destination);
+      mediaSourceRef.current
+        .connect(AudioNodeRef.current)
+        .connect(audioCtxRef.current.destination);
 
       setIsRecording(true);
     } catch (error) {
@@ -134,23 +158,93 @@ export default function VoiceRecorder({ onSave }: VoiceRecorderProps) {
   };
 
   const stopRecording = () => {
-    mediaRecorder.current?.stop();
+    wsRef.current?.send("end");
+
+    // 1. Отключаем worklet
+    if (AudioNodeRef.current) {
+      console.info("Отключаем worklet");
+      AudioNodeRef.current.disconnect();
+      AudioNodeRef.current = null;
+    }
+
+    // 2. Отключаем source
+    if (mediaSourceRef.current) {
+      console.info("Отключаем source");
+      mediaSourceRef.current.disconnect();
+      mediaSourceRef.current = null;
+    }
+
+    // 3. Останавливаем медиа-поток
+    if (mediaStreamRef.current) {
+      console.info("Останавливаем медиа-поток");
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
+      mediaStreamRef.current = null;
+    }
+
+    // 4. Закрываем AudioContext
+    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+      console.info("Закрываем AudioContext");
+      audioCtxRef.current.close();
+      audioCtxRef.current = null;
+    }
+
+    setIsReady(true);
     setIsRecording(false);
+
+    console.log("Запись остановлена");
+  };
+
+  const testRecord = async () => {
+    const int16 = bufferRef.current;
+    const audioContext = new AudioContext();
+
+    // Важно! Разрешить воспроизведение
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+
+    // Нормализуем в Float32
+    const float32Array = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i++) {
+      float32Array[i] = int16[i] / 32768;
+    }
+
+    const audioBuffer = audioContext.createBuffer(
+      1,
+      float32Array.length,
+      44100
+    );
+    audioBuffer.copyToChannel(float32Array, 0);
+
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext.destination);
+    source.start();
+
+    console.log("Воспроизводим:", int16.length, "сэмплов");
   };
 
   return (
     <>
       <button
         disabled={!isConnected}
-        className={`my-4 px-6 py-2 text-white rounded disabled:bg-gray-400 disabled:cursor-not-allowed ${
+        className={`my-4 py-2 text-white rounded cursor-pointer disabled:bg-gray-400 disabled:cursor-not-allowed ${
           isRecording ? "bg-red-500" : "bg-green-500"
-        }`}
+        } ${isRecording ? "px-6" : "pl-2 pr-6"}`}
         onClick={isRecording ? stopRecording : startRecording}
       >
-        {isRecording ? "⏹ Остановить" : "🎙 Начать запись"}
+        {isRecording ? "Остановить" : "🎙 Начать запись"}
       </button>
-      
-      {/* <button onClick={test}>123</button> */}
+
+      <button
+        disabled={!isReady}
+        className={`my-4 ml-2 pl-2 pr-6 py-2 text-white rounded bg-purple-400 disabled:bg-gray-400 disabled:cursor-not-allowed`}
+        onClick={testRecord}
+      >
+        🔊 Воспроизвести
+      </button>
 
       <div className="flex items-center gap-4 p-3 my-3 shadow bg-white">
         <span className="text-gray-700 font-medium">Ваш запрос:</span>

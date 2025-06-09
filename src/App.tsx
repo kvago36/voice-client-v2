@@ -10,8 +10,6 @@ import Layout from "./components/Layout";
 
 import { User, Text } from "./types";
 
-import init from "../pkg/webaudio.js";
-
 function App() {
   const [name, setName] = useState("");
   const [userId, setUserId] = useState("");
@@ -20,8 +18,6 @@ function App() {
   const [errorText, setErrorText] = useState("");
 
   useEffect(() => {
-    init()
-
     fetch(`${HOST}/api/users/`)
       .then((res) => res.json())
       .then((data) => setUsers(data.users))
