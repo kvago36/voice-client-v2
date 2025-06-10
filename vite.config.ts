@@ -10,8 +10,7 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp'
     },
   },
-    // Или динамически из переменной окружения
-  base: process.env.NODE_ENV === 'production' ? 'voice-client-v2/' : '/',
-  
+  base: process.env.VITE_BASE_PATH || '/',
+
   plugins: [react(), tailwindcss()],
 })
